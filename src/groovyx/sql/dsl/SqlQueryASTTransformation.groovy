@@ -39,7 +39,7 @@ import groovyx.sql.dsl.expr.builder.*
 import groovyx.sql.dsl.predef.*
 import groovyx.sql.dsl.expr.*
 /**
- *
+ *  1111
  * @author V. Shyshkin
  */
 //@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
