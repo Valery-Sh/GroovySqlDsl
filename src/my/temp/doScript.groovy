@@ -15,7 +15,9 @@ def sqlBuilder = sqlAdapter.query {
     //where  11 > 1 && 14 < 89 && !(12 > 2 || 15 < 90)
     //where 5 > 4 || "a008".upper(123) < 10
  //   where 5 > 4.upper(555) || "10" < "a008".lower(666)
-if ( true ) ""
+if ( true ) {
+   "" 
+}
 
 //from p in Person
 //    
