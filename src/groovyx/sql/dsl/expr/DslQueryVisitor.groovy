@@ -71,9 +71,25 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
         block.statements.each() {
             if ( ! (it instanceof ExpressionStatement && it.expression instanceof MethodCallExpression) ) {
                 addError(msg,it)
+                return
             }
-        }
+            methods << it.expression.method.text
+            def object = it.expression.objectExpression
+            while ( "this" != object.text ) {
+                if ( object instanceof MethodCallExpression ) {
+                    methods << object.method.text
+                    object = object.objectExpression
+                } else {
+                    addError(msg,object)
+                    return
+                }
+            }//while
+            methods.each {
+                println it
+            }
+        }//each
     }
+    
     def addError(msg,expr) {
         groovyx.sql.dsl.SqlQueryASTTransformation.addError(sourceUnit,msg,expr)
     }
