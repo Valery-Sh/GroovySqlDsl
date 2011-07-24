@@ -52,6 +52,7 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
     def rootExpression
     
     def methods = []
+    def supportedMethods = ["from","join","leftJoin","rightJoin","fullJoin"]
     
 /*    def DslQueryVisitor(sourceUnit,state) {
         this.sourceUnit = sourceUnit
@@ -73,9 +74,11 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
                 addError(msg,it)
                 return
             }
-            methods << it.expression.method.text
-            def object = it.expression.objectExpression
-            while ( "this" != object.text ) {
+            //methods << it.expression.method.text
+            
+            def object = it.expression
+            def cond = true
+            while (cond) {
                 if ( object instanceof MethodCallExpression ) {
                     methods << object.method.text
                     object = object.objectExpression
@@ -83,11 +86,25 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
                     addError(msg,object)
                     return
                 }
+                cond = ! (object instanceof VariableExpression && "this" == object.text) 
             }//while
-            methods.each {
-                println it
-            }
         }//each
+        methods.each {
+            println it
+        }
+        
+        methods = methods.reverse()
+   /*     methods.each {
+            if ( ! (object.method.text.toLowerCase() in supportedMethods) )  {
+                addError("Unsupported method name '${object.method.text}'.",object.method)
+                return
+            }
+            
+        }
+*/        
+
+        
+
     }
     
     def addError(msg,expr) {
