@@ -33,6 +33,9 @@ import org.codehaus.groovy.ast.expr.MapEntryExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.syntax.SyntaxException;
+
 import org.codehaus.groovy.ast.expr.CastExpression
 
 import groovyx.sql.dsl.expr.builder.*
@@ -46,7 +49,7 @@ import groovyx.sql.dsl.expr.*
 @GroovyASTTransformation(phase = CompilePhase.CONVERSION)
 class SqlQueryASTTransformation implements ASTTransformation {
 
-    void visit(ASTNode[] nodes, SourceUnit source) {
+    void visit_OLD(ASTNode[] nodes, SourceUnit source) {
         def logicalExpressionVisitor = new LogicalExpressionVisitor()        
         
         def whereMethodVisitor = new ClassCodeVisitorSupport() {
@@ -116,6 +119,40 @@ class SqlQueryASTTransformation implements ASTTransformation {
     }//visit
     
     /////////////////////////////////
+    void visit(ASTNode[] nodes, SourceUnit source) {
+        
+        def dslQueryVisitor = new DslQueryVisitor(sourceUnit:source,state:null)        
+        
+
+        def queryMethodVisitor = new ClassCodeVisitorSupport() {
+            def whereExpr
+            def whereMethodCall
+            void visitMethodCallExpression(MethodCallExpression call) {
+                def exprTemp = call.arguments.expressions[0].getClass()
+                println "exprTemp: " + exprTemp
+                if (
+                    // 'sqlAdapter' variable
+                    call.objectExpression instanceof VariableExpression && call.objectExpression.variable == 'sqlAdapter' &&
+                    // 'query' or 'execute' method
+                    call.method instanceof ConstantExpression && call.method.value == 'query' &&
+                    // closure single argument
+                    call.arguments.expressions.size() == 1 && call.arguments.expressions[0] instanceof ClosureExpression
+                ) {
+                    ClosureExpression closureExpr = call.arguments.expressions[0]
+                    dslQueryVisitor.visitClosureExpression(closureExpr)
+                } else {
+                    super.visitMethodCallExpression(call)
+                }
+            }
+
+            protected SourceUnit getSourceUnit() { source }
+        }
+        
+        source.AST.classes.each { ClassNode cn ->
+            queryMethodVisitor.visitClass(cn)
+//            queryMethodVisitor.whereMethodCall.arguments = queryMethodVisitor.whereExpr
+        }
+    }//visit
 
     def getTransformation(expr,saveOperation=null) {
         def result
@@ -137,6 +174,12 @@ class SqlQueryASTTransformation implements ASTTransformation {
             result = createMethodCall(expr,SqlExpression,saveOperation)
         }
         return result
+    }
+    static void addError(SourceUnit sourceUnit,String msg, ASTNode expr) {
+        int line = expr.getLineNumber();
+        int col = expr.getColumnNumber();
+        sourceUnit.getErrorCollector().addError(
+                new SyntaxErrorMessage(new SyntaxException(msg + '\n', line, col), sourceUnit));
     }
     
     
