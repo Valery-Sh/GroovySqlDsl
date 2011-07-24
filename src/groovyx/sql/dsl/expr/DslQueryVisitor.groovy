@@ -98,7 +98,7 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
         methods.each {
             println it.method.text
         }
-        
+       
         if ( !validateMethodOrder() ) {
             return
         }
