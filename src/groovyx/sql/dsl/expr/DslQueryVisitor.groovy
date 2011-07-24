@@ -10,6 +10,7 @@ import org.codehaus.groovy.ast.CodeVisitorSupport
 import org.codehaus.groovy.ast.stmt.*
 import org.codehaus.groovy.ast.expr.ExpressionStatement
 import org.codehaus.groovy.ast.expr.MethodCallExpression
+import org.codehaus.groovy.ast.expr.DeclarationExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.SpreadExpression
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
@@ -48,7 +49,7 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
     
     def state
     def sourceUnit
-    
+    def closure
     def rootExpression
     
     def methods = []
@@ -58,6 +59,7 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
                             "having","orderby"]
     
     public void visitClosureExpression(ClosureExpression expression) {
+        this.closure = expression
         expression.getCode().visit(this);
         //println "CLOSURE: " + expression.code.class
     }
@@ -99,9 +101,22 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
             println it.method.text
         }
        
-        if ( !validateMethodOrder() ) {
+/*        if ( !validateMethodOrder() ) {
             return
         }
+*/        
+        def f = methods[0]
+        def cast = f.getArguments().getExpression(0)
+        def typ = cast.type
+println "TYPE:" + typ.text       
+        def ve = new VariableExpression("me", typ)
+        //def ve = new VariableExpression("me")
+        def de = new DeclarationExpression(ve,new Token(Types.EQUAL,"=",-1,-1),new ConstantExpression(null))
+        def es = new ExpressionStatement(de)
+        def l = [es] + block.statements
+        BlockStatement bs = new BlockStatement(l,block.variableScope)
+        closure.setCode(bs)
+        println "new STMT: " + closure.code.statements[0].getText()
     }
     
     def validateMethodOrder() {

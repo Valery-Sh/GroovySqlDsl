@@ -45,8 +45,8 @@ import groovyx.sql.dsl.expr.*
  *  1111
  * @author V. Shyshkin
  */
-//@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
-@GroovyASTTransformation(phase = CompilePhase.CONVERSION)
+@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
+//@GroovyASTTransformation(phase = CompilePhase.CONVERSION)
 class SqlQueryASTTransformation implements ASTTransformation {
 
     void visit_OLD(ASTNode[] nodes, SourceUnit source) {
