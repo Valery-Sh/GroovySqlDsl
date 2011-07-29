@@ -53,13 +53,16 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
     def rootExpression
     
     def methods = []
-    def supportedMethods = ["from","join","leftjoin",
+    def supportedMethods = ["select","from","join","leftjoin",
                             "rightjoin","fulljoin",
                             "on", "where","groupby",
                             "having","orderby"]
     
     public void visitClosureExpression(ClosureExpression expression) {
-        this.closure = expression
+        closure = expression
+        if ( closure.isParameterSpecified()) {
+            
+        }
         expression.getCode().visit(this);
         //println "CLOSURE: " + expression.code.class
     }
@@ -101,14 +104,14 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
             println it.method.text
         }
        
-/*        if ( !validateMethodOrder() ) {
+        if ( !validateMethodOrder() ) {
             return
         }
-*/        
-        def f = methods[0]
+        
+/*        def f = methods[0]
         def cast = f.getArguments().getExpression(0)
         def typ = cast.type
-println "TYPE:" + typ.text       
+        println "TYPE:" + typ.text       
         def ve = new VariableExpression("me", typ)
         //def ve = new VariableExpression("me")
         def de = new DeclarationExpression(ve,new Token(Types.EQUAL,"=",-1,-1),new ConstantExpression(null))
@@ -117,19 +120,32 @@ println "TYPE:" + typ.text
         BlockStatement bs = new BlockStatement(l,block.variableScope)
         closure.setCode(bs)
         println "new STMT: " + closure.code.statements[0].getText()
+*/        
     }
     
     def validateMethodOrder() {
 
         def i = 0
+        def c = 0
+        while( i < methods.size() && methods[i].method.text.toLowerCase() == "select" ) {
+            i++
+            c++
+        }
+        if ( c > 1 ) {
+            addError("Too many methods with a name 'select' ",methods[i-1])
+            return false
+        }
+        
+        c = 0
         while( i < methods.size() && methods[i].method.text.toLowerCase() == "from" ) {
             i++
+            c++
         }
-        if ( i == 0) {
-            addError("A query must have a method 'from' ",methods[0])
+        if ( c == 0) {
+            addError("A query must have a method 'from' ",closure)
             return false
             
-        } else if ( i > 1 ) {
+        } else if ( c > 1 ) {
             addError("Too many methods with a name 'from' ",methods[i-1])
             return false
             
@@ -147,7 +163,7 @@ println "TYPE:" + typ.text
             i = j
         }
         
-        def c = 0
+        c = 0
         while( i < methods.size() && methods[i].method.text.toLowerCase() == "where" ) {
             i++
             c++
