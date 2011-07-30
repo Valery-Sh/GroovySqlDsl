@@ -15,13 +15,13 @@ class SqlFunction {
     def argTypes = []
     def String family
     
-    static boolean isSupported(String fn) {
+    boolean isSupported(String fn) {
         if ( name == fn.toUpperCase() || (fn.toUpperCase() in synonyms)) {
             return true
         } 
         return false
     }
-    static boolean isSupported(String fn, List<Class> types) {
+    boolean isSupported(String fn, List<Class> types) {
         
         if ( ! isSupported(fn)) {
             return false

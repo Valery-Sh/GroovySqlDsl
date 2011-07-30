@@ -55,11 +55,21 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
             errors << ["Unsupported binary operation '${expr.operation.text}'",expr]
             return
         }
+        
+        if ( ! isSupportedExpression(expr.leftExpression) ) {
+            errors << ["Unsupported left part of the binary expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}')",expr.leftExpression]
+            return
+        }
+        
         expr.leftExpression.visit(this)
         if ( errorFound()) {
             return
         }
 //        def l = whereList.pop()
+        if ( ! isSupportedExpression(expr.rightExpression) ) {
+            errors << ["Unsupported right part  of the binary  expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}')",expr.rightExpression]
+            return
+        }
 
         expr.rightExpression.visit(this)
         if ( errorFound()) {
@@ -86,7 +96,21 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
     protected boolean errorFound() {
         ! errors.isEmpty()
     }
-    
+    /**
+     * <code>Where</code> or <code>On</code> must have exactly one argument.
+     * The argument expression may by one of the follows:
+     * <ul>
+     *    <li><code>ConstantExpression</code>. The value must be of type 
+     *    <code>java.lang.Boolean</code></li>  
+     *    <li><code>MethodCallExpression</code>. We need investigate is there
+     *     a function that returns <code>java.lang.Boolean</code> value</li>  
+     *    <li><code>PropertyExpression</code>. The property must be of 
+     *     <code>java.lang.Boolean</code> type</li>  
+     *    <li><code>BinaryExpression</code>. The operation must be logical or 
+     *    comparison operation.</li>
+     *    <li><code>NotExpression</code>.</li>
+     * </ul>
+     */
     void startVisit() {
         if ( ownerCall.arguments.expressions.isEmpty() ) {
             errors << ["Method '${ownerCall.method.text}' must have exactly one argument",call]
@@ -95,14 +119,18 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         def arg = ownerCall.arguments.expressions[0]
         if ( ! ( 
                 arg instanceof BinaryExpression  ||
-                arg instanceof MethodCallExpression
+                arg instanceof NotExpression  ||
+                arg instanceof MethodCallExpression ||
+                arg instanceof PropertyExpression ||
+                arg instanceof ConstantExpression && arg.value instanceof Boolean  
                ) 
            )
         {
             errors << ["Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",arg]
             return
         }
-        ownerCall.arguments.visit(this)
+        ownerCall.arguments.expressions[0].visit(this) //visit the expression not argumentList
+        //ownerCall.arguments.visit(this)
         if ( errorFound() ) {
             return
         }
@@ -126,8 +154,24 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         }
         return result
     }
+    protected boolean validateProperty(PropertyExpression prop) {
+        def result = false
+        if ( prop.property instanceof ConstantExpression && 
+             prop.objectExpression instanceof VariableExpression &&
+             prop.objectExpression.name in owner.aliases
+            ) 
+        {
+            result = true 
+        }
+        return result
+        
+    }
+    
     void visitVariableExpression(VariableExpression expr) {
-        if ( ! SqlVars.contains(expr.name) ) {
+        if ( "this" == expr.name ) {
+            return
+        }
+        if ( ! SqlVariables.isSupported(expr.name) ) {
             errors << ["Unsupported variable  '${expr.name}'",expr]
             return
         }
@@ -139,11 +183,31 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
                     ])))
 */                    
     }
-            
+    boolean isSupportedExpression(Expression expr) {
+        return  expr instanceof BinaryExpression  ||
+                expr instanceof VariableExpression  ||
+                expr instanceof MethodCallExpression ||
+                expr instanceof PropertyExpression ||
+                expr instanceof ConstantExpression
+        
+    }
     void visitMethodCallExpression(MethodCallExpression expr) {
         //println "visitMethodCallExpression.method="  + expr.method.text  
-
+        if ( ! SqlFunctions.isSupported(expr.method.text) ) {
+            errors << ["Unsupported function '${expr.method.text}'",expr]
+            return
+        }
+        
+        if ( ! isSupportedExpression(expr.objectExpression) ) {
+            errors << ["Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",expr]
+            return
+        }
+        
         expr.objectExpression.visit(this)
+        if ( errorFound()) {
+            return
+        }
+        expr.arguments.visit(this)
 
 /*        def obj = whereList.pop()
         expr.arguments.visit(this)
@@ -202,14 +266,19 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
     void visitListOfExpressions(List<? extends Expression> list) {
         if (list == null) {
         }
+        
         def l = []
         def i = 0
-        for (Expression expression : list) {
-            if (expression instanceof SpreadExpression) {
-                Expression spread = ((SpreadExpression) expression).getExpression();
+        for (Expression expr : list) {
+            if ( ! isSupportedExpression(expr) ) {
+                errors << ["UnsupportedExpression '${expr.text}'",expr]
+                return
+            }
+            if (expr instanceof SpreadExpression) {
+                Expression spread = ((SpreadExpression) expr).getExpression();
                 spread.visit(this);
             } else {
-                expression.visit(this);
+                expr.visit(this);
             }
             if ( errorFound() ) {
                 return
@@ -225,8 +294,13 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         }//for
         //        whereList << l
     }
-    public void visitPropertyExpression(PropertyExpression expression) {
-        expression.getObjectExpression().visit(this);
+    public void visitPropertyExpression(PropertyExpression expr) {
+        if ( ! validateProperty(expr) ) {
+            errors << ["Invalid property expression '${expr.text}' in the method '${ownerCall.method.text}'",expr]
+            return
+        }
+    
+/*        expression.getObjectExpression().visit(this);
         def obj = whereList[whereList.size()-1]
         expression.getProperty().visit(this);
         def prop = whereList[whereList.size()-1]
@@ -240,7 +314,7 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
                     ])) )
         whereList << newExpr
         rootExpression = newExpr
-
+*/
     }
     public void visitCastExpression(CastExpression expr) {
         expr.getExpression().visit(this);
