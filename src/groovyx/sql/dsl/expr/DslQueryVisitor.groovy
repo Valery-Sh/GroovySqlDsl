@@ -24,6 +24,7 @@ import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
+import org.codehaus.groovy.ast.expr.PostfixExpression
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.expr.TupleExpression
@@ -57,6 +58,8 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
                             "rightjoin","fulljoin",
                             "on", "where","groupby",
                             "having","orderby"]
+
+    def aliases = []
     
     public void visitClosureExpression(ClosureExpression expression) {
         closure = expression
@@ -107,7 +110,10 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
         if ( !validateMethodOrder() ) {
             return
         }
-        
+
+        if ( ! validateMethods()) {
+            return
+        }
 /*        def f = methods[0]
         def cast = f.getArguments().getExpression(0)
         def typ = cast.type
@@ -122,7 +128,134 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
         println "new STMT: " + closure.code.statements[0].getText()
 */        
     }
+    def boolean validateMethods(){
+        def result = true
+        methods.each{
+            switch(it.method.text.toLowerCase()) {
+                case "select" : 
+                    result = validateSelect(it)
+                    break;
+                case "from" : 
+                case "join" : 
+                case "leftjoin" : 
+                case "rightjoin" : 
+                case "fulljoin" : 
+                    result = validateFrom(it)
+                    break
+                case "where" :
+                    result = validateWhere(it)
+                    break
+                case "on" :
+                    //result = validateWhere(it)
+                    break
+                case "orderby" :
+                    result = validateOrderBy(it)
+                    break
+                case "groupby" :   
+                    //result = validateGroupBy(it)
+                    break
+                case "having" :   
+                    result = validateHaving(it)
+                    break;
+            }//switch
+            if ( ! result ) {
+                return false
+            }
+        }//each
+        return result
+        
+    }
+    /**
+     * <ul>
+     * <li>Must have at least one parameter</li>
+     * <li>Each parameter may be:</li>
+     * <ul>
+     *  <li><code>VariableExpression</code></li> 
+     *  <li><code>CastExpression</code></li> 
+     * </ul>
+     * </ul>
+     * If a parameter is a <code>VariableExpression</code> then
+     * it must be present in a closure parameter list. <p>
+     *  
+     */
+    def boolean validateFrom(MethodCallExpression call) {
+//        println "call.arguments.expressions=" + call.arguments.expressions.class
+        if ( call.arguments.expressions.isEmpty() ) {
+            addError("Method '${call.method.text}' must have at least one argument",call)
+            return false
+        }
+        def alias
+        call.arguments.expressions.each {
+            if ( it instanceof VariableExpression ) {
+                if ( ! isInClosureParemeters(it) ) {
+                    addError("Closure parameters doesn't contain a parameter '${it.name}' (method '${call.method.text}')",it)
+                    return false
+                }
+                alias = it.name
+            } else if ( it instanceof CastExpression && it.expression instanceof VariableExpression) {
+                alias = it.expression.name
+            } else {
+                addError("Unsupported parameter expression in the method '${call.method.text}'",it)
+                return false
+            }
+            if ( alias in aliases ) {
+                addError("Alias  '${alias}' is allready in use ",it)
+                return false
+            }
+            aliases << alias
+        }
+        
+        return true
+        //if ( call instanceof )
+    }
     
+    def boolean validateOrderBy(MethodCallExpression call) {
+        if ( call.arguments.expressions.isEmpty() ) {
+            addError("Method '${call.method.text}' must have at least one argument",call)
+            return false
+        }
+        call.arguments.expressions.each{
+            def result = false
+            if ( ! (it instanceof PropertyExpression)) {
+                addError("Not a property expression '${it.text}' in the method '${call.method.text}'",call)
+            } else if ( ! validateProperty(call,it)) {
+                addError("Invalid property expression '${it.text}' in the method '${call.method.text}'",it)
+            } else {
+                result = true
+            }
+            return result
+        }
+        
+    }
+    
+    def boolean validateProperty(MethodCallExpression call,PropertyExpression prop) {
+        def result = false
+        if ( prop.property instanceof ConstantExpression && 
+             prop.objectExpression instanceof PropertyExpression &&
+             (prop.property.value == "ASC" || 
+              prop.property.value == "DESC") )
+        {
+            result = true
+        } else if ( prop.property instanceof ConstantExpression && 
+             prop.objectExpression instanceof VariableExpression &&
+             prop.property.value != "ASC" && prop.property.value != "DESC") 
+        {
+            result = true 
+        } else {
+            addError("Invalid property expression '${prop.text}' in the method '${call.method.text}'",prop)
+        }
+        return result
+        
+    }
+    def boolean isInClosureParemeters(variable) {
+        def result = false
+        closure.parameters.each {
+            if ( it.name.equals(variable.name) ) {
+                result = true
+            }
+        }
+        return result
+    }
     def validateMethodOrder() {
 
         def i = 0
@@ -205,8 +338,20 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
             return false
             
         }
-        
+        return true
     }
+    
+    def boolean validateWhere(MethodCallExpression call) {
+        def whereVisitor = new WhereValidateVisitor(owner:this,ownerCall:call)
+        whereVisitor.startVisit()
+        if ( ! whereVisitor.errors.isEmpty() ) {
+println "WHERE V SIZE: " + whereVisitor.errors.size()           
+println "WHERE V class: " + whereVisitor.errors[0].size()
+            addError(whereVisitor.errors[0][0],whereVisitor.errors[0][1])
+            return false
+        }
+    }
+    
     def addError(msg,expr) {
         groovyx.sql.dsl.SqlQueryASTTransformation.addError(sourceUnit,msg,expr)
     }
