@@ -41,6 +41,10 @@ import org.codehaus.groovy.ast.expr.CastExpression
 import groovyx.sql.dsl.expr.builder.*
 import groovyx.sql.dsl.predef.*
 import groovyx.sql.dsl.expr.*
+
+import groovyx.sql.dsl.dialect.*
+
+import org.codehaus.groovy.ast.*
 /**
  *  1111
  * @author V. Shyshkin
@@ -49,77 +53,13 @@ import groovyx.sql.dsl.expr.*
 @GroovyASTTransformation(phase = CompilePhase.CONVERSION)
 class SqlQueryASTTransformation implements ASTTransformation {
 
-    void visit_OLD(ASTNode[] nodes, SourceUnit source) {
-        def logicalExpressionVisitor = new LogicalExpressionVisitor()        
-        
-        def whereMethodVisitor = new ClassCodeVisitorSupport() {
-            
-            def whereExpr
-            def whereMethodCall
-            
-            void visitBinaryExpression(BinaryExpression binExpr) {
-                super.visitBinaryExpression(binExpr)
-            }
-                        
-            void visitMethodCallExpression(MethodCallExpression clauseCall) {
-                // transform "where a op b" into "where WhereClause(a, op, b)"
-                if (
-                    clauseCall.method instanceof ConstantExpression &&
-                    (clauseCall.method.value == "where" || clauseCall.method.value == "join") &&
-                    clauseCall.arguments instanceof ArgumentListExpression &&
-                    clauseCall.arguments.expressions.size() == 1 &&
-                    ( clauseCall.arguments.expressions[0] instanceof BinaryExpression ||
-                        clauseCall.arguments.expressions[0] instanceof NotExpression )  
-                ) {
-                    whereMethodCall = clauseCall
-                    clauseCall.arguments.expressions[0].visit(logicalExpressionVisitor)
-                    whereExpr = logicalExpressionVisitor.rootExpression
-                }                    
-            }
-
-            void visitClosureExpression(ClosureExpression expression) {
-                super.visitClosureExpression(expression)
-            }
-
-            protected SourceUnit getSourceUnit() { 
-                source 
-            }
-        }
-
-        def queryMethodVisitor = new ClassCodeVisitorSupport() {
-            def whereExpr
-            def whereMethodCall
-            void visitMethodCallExpression(MethodCallExpression call) {
-                def exprTemp = call.arguments.expressions[0].getClass()
-                println "exprTemp: " + exprTemp
-                if (
-                    // 'sqlAdapter' variable
-                    call.objectExpression instanceof VariableExpression && call.objectExpression.variable == 'sqlAdapter' &&
-                    // 'query' or 'execute' method
-                    call.method instanceof ConstantExpression && call.method.value == 'query' &&
-                    // closure single argument
-                    call.arguments.expressions.size() == 1 && call.arguments.expressions[0] instanceof ClosureExpression
-                ) {
-                    ClosureExpression closureExpr = call.arguments.expressions[0]
-                    whereMethodVisitor.visitClosureExpression(closureExpr)
-                    whereExpr = whereMethodVisitor.whereExpr
-                    whereMethodCall = whereMethodVisitor.whereMethodCall
-                } else {
-                    super.visitMethodCallExpression(call)
-                }
-            }
-
-            protected SourceUnit getSourceUnit() { source }
-        }
-        
-        source.AST.classes.each { ClassNode cn ->
-            queryMethodVisitor.visitClass(cn)
-            queryMethodVisitor.whereMethodCall.arguments = queryMethodVisitor.whereExpr
-        }
-    }//visit
-    
-    /////////////////////////////////
     void visit(ASTNode[] nodes, SourceUnit source) {
+            ModuleNode moduleNode = source.getAST();
+            //CompilerConfiguration config = moduleNode.getUnit().getConfig();
+            GroovyClassLoader cl = new GroovyClassLoader(moduleNode.getUnit().getClassLoader());
+        
+        def dialect = Dialects.getDialect("StdDialect",cl)
+        dialect.printMe()
         
         def dslQueryVisitor = new DslQueryVisitor(sourceUnit:source,state:null)        
         

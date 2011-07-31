@@ -44,7 +44,7 @@ import groovyx.sql.dsl.expr.*
 class WhereValidateVisitor extends ClassCodeVisitorSupport {
     
     def rootExpression
-    def errors = []
+    //def errors = []
     def ownerCall
     def owner
     
@@ -52,12 +52,14 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
     
     void visitBinaryExpression(BinaryExpression expr) {
         if ( ! isOperationSupported(expr.operation.text)) {
-            errors << ["Unsupported binary operation '${expr.operation.text}'",expr]
+            //errors << ["Unsupported binary operation '${expr.operation.text}'",expr]
+            addError("Unsupported binary operation '${expr.operation.text}'",expr)
             return
         }
         
         if ( ! isSupportedExpression(expr.leftExpression) ) {
-            errors << ["Unsupported left part of the binary expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}')",expr.leftExpression]
+//            errors << ["Unsupported binary expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', left part)",expr.leftExpression]
+            addError("Unsupported binary expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', left part)",expr.leftExpression)            
             return
         }
         
@@ -65,36 +67,20 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         if ( errorFound()) {
             return
         }
-//        def l = whereList.pop()
-        if ( ! isSupportedExpression(expr.rightExpression) ) {
-            errors << ["Unsupported right part  of the binary  expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}')",expr.rightExpression]
-            return
-        }
 
-        expr.rightExpression.visit(this)
-        if ( errorFound()) {
+        if ( ! isSupportedExpression(expr.rightExpression) ) {
+            //errors << ["Unsupported binary  expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', , right part)",expr.rightExpression]
+            addError("Unsupported binary  expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', , right part)",expr.rightExpression)
             return
         }
-        
-/*        def r = whereList.pop()
-        def newExpr = new ConstructorCallExpression(
-            ClassHelper.make(SqlBinaryExpression),
-            new TupleExpression(new NamedArgumentListExpression([
-                        new MapEntryExpression(new ConstantExpression('leftExpression'), l),                        
-                        new MapEntryExpression(new ConstantExpression('operation'), new ConstantExpression(expr.operation.text)),                        
-                        new MapEntryExpression(new ConstantExpression('rightExpression'), r)                        
-                
-                    ]) ) )
-                
-        whereList << newExpr
-        rootExpression = newExpr
-  */              
+        expr.rightExpression.visit(this)
     }
     protected boolean isOperationSupported(String op) {
         return ["+","-","*","/","**","==","!=","<","<=",">",">=","&&","||"].contains(op)
     }
     protected boolean errorFound() {
-        ! errors.isEmpty()
+        ! owner.sourceUnit.getErrorCollector().errors.isEmpty()
+        //! errors.isEmpty()
     }
     /**
      * <code>Where</code> or <code>On</code> must have exactly one argument.
@@ -113,7 +99,8 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
      */
     void startVisit() {
         if ( ownerCall.arguments.expressions.isEmpty() ) {
-            errors << ["Method '${ownerCall.method.text}' must have exactly one argument",call]
+            //errors << ["Method '${ownerCall.method.text}' must have exactly one argument",call]
+            addError("Method '${ownerCall.method.text}' must have exactly one argument",call)            
             return
         }
         def arg = ownerCall.arguments.expressions[0]
@@ -126,7 +113,8 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
                ) 
            )
         {
-            errors << ["Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",arg]
+            //errors << ["Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",arg]
+            addError("Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",arg)            
             return
         }
         ownerCall.arguments.expressions[0].visit(this) //visit the expression not argumentList
@@ -136,9 +124,15 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         }
 
     }
+    
+    void addError(msg,expr) {
+        owner.addError(msg,expr)
+    }
+    
     void visitConstantExpression(ConstantExpression expr) {
         if ( ! validateConstant(expr) ) {
-            errors << ["Invalid constant '${expr.value}'",expr]
+            //errors << ["Invalid constant '${expr.value}'",expr]
+            addError("Invalid constant '${expr.value}'",expr)
         }
         /*        whereList << new ConstructorCallExpression(
         ClassHelper.make(SqlConstantExpression),
@@ -172,7 +166,8 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
             return
         }
         if ( ! SqlVariables.isSupported(expr.name) ) {
-            errors << ["Unsupported variable  '${expr.name}'",expr]
+            //errors << ["Unsupported variable  '${expr.name}'",expr]
+            addError("Unsupported variable  '${expr.name}'",expr)
             return
         }
 
@@ -194,12 +189,14 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
     void visitMethodCallExpression(MethodCallExpression expr) {
         //println "visitMethodCallExpression.method="  + expr.method.text  
         if ( ! SqlFunctions.isSupported(expr.method.text) ) {
-            errors << ["Unsupported function '${expr.method.text}'",expr]
+            //errors << ["Unsupported function '${expr.method.text}'",expr]
+            addError("Unsupported function '${expr.method.text}'",expr)
             return
         }
         
         if ( ! isSupportedExpression(expr.objectExpression) ) {
-            errors << ["Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",expr]
+            //errors << ["Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",expr]
+            addError("Unsupported expression '${arg.text}' (method '${ownerCall.method.text}')",expr)
             return
         }
         
@@ -271,7 +268,8 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         def i = 0
         for (Expression expr : list) {
             if ( ! isSupportedExpression(expr) ) {
-                errors << ["UnsupportedExpression '${expr.text}'",expr]
+                //errors << ["UnsupportedExpression '${expr.text}'",expr]
+                addError("UnsupportedExpression '${expr.text}'",expr)
                 return
             }
             if (expr instanceof SpreadExpression) {
@@ -296,7 +294,8 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
     }
     public void visitPropertyExpression(PropertyExpression expr) {
         if ( ! validateProperty(expr) ) {
-            errors << ["Invalid property expression '${expr.text}' in the method '${ownerCall.method.text}'",expr]
+            //errors << ["Invalid property expression '${expr.text}' in the method '${ownerCall.method.text}'",expr]
+            addError("Invalid property expression '${expr.text}' in the method '${ownerCall.method.text}'",expr)
             return
         }
     
@@ -330,7 +329,7 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         
     }
             
-    protected SourceUnit getSourceUnit() { source }
+    protected SourceUnit getSourceUnit() { owner.sourceUnit }
     
 }
 
