@@ -1,4 +1,4 @@
-/** VVVVV
+/** VVVV
  */
 package groovyx.sql.dsl
 
