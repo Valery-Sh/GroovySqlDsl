@@ -49,20 +49,18 @@ import org.codehaus.groovy.ast.*
  *  1111
  * @author V. Shyshkin
  */
-//@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
-@GroovyASTTransformation(phase = CompilePhase.CONVERSION)
-class SqlQueryASTTransformation implements ASTTransformation {
-    SqlQueryASTTransformation() {
-//            ModuleNode moduleNode = source.getAST();
-            //CompilerConfiguration config = moduleNode.getUnit().getConfig();
-//            GroovyClassLoader cl = new GroovyClassLoader(moduleNode.getUnit().getClassLoader());
-//println "========== AFTER ++++++++++++++++++"        
-//        def dialect = Dialects.getDialect("StdDialect")
-//        dialect.printMe()
-        
-    }
+@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
+//@GroovyASTTransformation(phase = CompilePhase.CONVERSION)
+class SqlQueryASTTransformationC implements ASTTransformation {
+
     void visit(ASTNode[] nodes, SourceUnit source) {
+            ModuleNode moduleNode = source.getAST();
+            //CompilerConfiguration config = moduleNode.getUnit().getConfig();
+            GroovyClassLoader cl = new GroovyClassLoader(moduleNode.getUnit().getClassLoader());
         
+        def dialect = Dialects.getDialect("StdDialect",cl)
+        println "___________________ canon"
+        dialect.printMe()
         
         def dslQueryVisitor = new DslQueryVisitor(sourceUnit:source,state:null)        
         
@@ -95,8 +93,6 @@ class SqlQueryASTTransformation implements ASTTransformation {
             queryMethodVisitor.visitClass(cn)
 //            queryMethodVisitor.whereMethodCall.arguments = queryMethodVisitor.whereExpr
         }
-        
-        
     }//visit
 
     def getTransformation(expr,saveOperation=null) {
@@ -123,7 +119,7 @@ class SqlQueryASTTransformation implements ASTTransformation {
     static void addError(SourceUnit sourceUnit,String msg, ASTNode expr) {
         int line = expr.getLineNumber();
         int col = expr.getColumnNumber();
-        sourceUnit.getErrorCollector().addFatalError(
+        sourceUnit.getErrorCollector().addError(
                 new SyntaxErrorMessage(new SyntaxException(msg + '\n', line, col), sourceUnit));
     }
     

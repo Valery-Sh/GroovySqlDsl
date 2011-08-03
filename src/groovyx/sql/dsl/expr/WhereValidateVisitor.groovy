@@ -44,7 +44,6 @@ import groovyx.sql.dsl.expr.*
 class WhereValidateVisitor extends ClassCodeVisitorSupport {
     
     def rootExpression
-    //def errors = []
     def ownerCall
     def owner
     
@@ -52,13 +51,11 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
     
     void visitBinaryExpression(BinaryExpression expr) {
         if ( ! isOperationSupported(expr.operation.text)) {
-            //errors << ["Unsupported binary operation '${expr.operation.text}'",expr]
             addError("Unsupported binary operation '${expr.operation.text}'",expr)
             return
         }
         
         if ( ! isSupportedExpression(expr.leftExpression) ) {
-//            errors << ["Unsupported binary expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', left part)",expr.leftExpression]
             addError("Unsupported binary expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', left part)",expr.leftExpression)            
             return
         }
@@ -69,7 +66,6 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         }
 
         if ( ! isSupportedExpression(expr.rightExpression) ) {
-            //errors << ["Unsupported binary  expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', , right part)",expr.rightExpression]
             addError("Unsupported binary  expression '${expr.leftExpression.text}' (method '${ownerCall.method.text}', , right part)",expr.rightExpression)
             return
         }
@@ -79,8 +75,7 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         return ["+","-","*","/","**","==","!=","<","<=",">",">=","&&","||"].contains(op)
     }
     protected boolean errorFound() {
-        ! owner.sourceUnit.getErrorCollector().errors.isEmpty()
-        //! errors.isEmpty()
+        return owner.sourceUnit.getErrorCollector().hasErrors()
     }
     /**
      * <code>Where</code> or <code>On</code> must have exactly one argument.
@@ -152,7 +147,7 @@ class WhereValidateVisitor extends ClassCodeVisitorSupport {
         def result = false
         if ( prop.property instanceof ConstantExpression && 
              prop.objectExpression instanceof VariableExpression &&
-             prop.objectExpression.name in owner.aliases
+             prop.objectExpression.variable in owner.aliases
             ) 
         {
             result = true 

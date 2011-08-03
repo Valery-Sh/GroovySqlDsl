@@ -233,12 +233,17 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
         if ( prop.property instanceof ConstantExpression && 
              prop.objectExpression instanceof PropertyExpression &&
              (prop.property.value == "ASC" || 
-              prop.property.value == "DESC") )
+              prop.property.value == "DESC") &&
+              prop.objectExpression.objectExpression instanceof VariableExpression &&
+              prop.objectExpression.objectExpression.variable in aliases
+            )
         {
+            
             result = true
         } else if ( prop.property instanceof ConstantExpression && 
              prop.objectExpression instanceof VariableExpression &&
-             prop.property.value != "ASC" && prop.property.value != "DESC") 
+             prop.property.value != "ASC" && prop.property.value != "DESC" &&
+             prop.objectExpression.variable in aliases) 
         {
             result = true 
         } else {
@@ -346,8 +351,8 @@ class DslQueryVisitor extends ClassCodeVisitorSupport {
         whereVisitor.startVisit()
         //if ( ! whereVisitor.errors.isEmpty() ) {
         if ( whereVisitor.errorFound() ) {
-println "WHERE V SIZE: " + whereVisitor.errors.size()           
-println "WHERE V class: " + whereVisitor.errors[0].size()
+//println "WHERE V SIZE: " + whereVisitor.errors.size()           
+//println "WHERE V class: " + whereVisitor.errors[0].size()
             //addError(whereVisitor.errors[0][0],whereVisitor.errors[0][1])
             return false
         }
